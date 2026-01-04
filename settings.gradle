@@ -1,1 +1,8 @@
-rootProject.name = 'brown-house-46-api'
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "brown-house-46-api"
