@@ -1,0 +1,44 @@
+name: CD - deploy to EC2 (prod)
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::521176575119:role/bh46-prod-api-github-actions-role
+          aws-region: ap-northeast-2
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Docker image
+        run: |
+          docker build -t bh46-prod-api .
+          docker tag bh46-prod-api:latest 521176575119.dkr.ecr.ap-northeast-2.amazonaws.com/bh46-prod-api:latest
+          docker push 521176575119.dkr.ecr.ap-northeast-2.amazonaws.com/bh46-prod-api:latest
+
+      - name: Deploy via SSM
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=instanceIds,Values=i-06b74a432bd1a38c5" \
+            --comment "Deploy bh46-prod-api" \
+            --parameters commands="\
+              docker stop bh46-prod-api || true,\
+              docker rm bh46-prod-api || true,\
+              docker pull 521176575119.dkr.ecr.ap-northeast-2.amazonaws.com/bh46-prod-api:latest,\
+              docker run -d --name bh46-prod-api -p 8080:8080 521176575119.dkr.ecr.ap-northeast-2.amazonaws.com/bh46-prod-api:latest"
